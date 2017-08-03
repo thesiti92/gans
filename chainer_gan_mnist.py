@@ -249,6 +249,7 @@ def main():
     save_x(x_gen)
 
     y = plot_z_space(gen, width=2)
+    np.save('y_gen.npy', cuda.to_cpu(y.data))
     save_x(y)
 
 
