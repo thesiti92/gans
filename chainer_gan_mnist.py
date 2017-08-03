@@ -17,7 +17,7 @@ from itertools import product
 
 from scipy.misc import imsave
 
-width = 2
+width = 4
 num_samples = 15
 
 class InvertLoss(function.Function):
@@ -170,8 +170,8 @@ def save_x(x_gen):
     imsave('x_gen.png', x_gen_img)
 
 def plot_z_space(gen,width=2):
-    num_samples = 15**2
-    z_dim = 1
+    num_samples = 15
+    z_dim = 2
     x = np.linspace(-width,width,num_samples)
     zs = np.meshgrid(*([x]*z_dim))
     #zs = list(product(np.linspace(-width,width,num_samples), 
@@ -180,7 +180,6 @@ def plot_z_space(gen,width=2):
     zs_gpu = cuda.to_gpu(zs.reshape(num_samples**z_dim,z_dim,1,1), device=0)
     z = Variable(zs_gpu)
     y = gen(z)
-    print y.shape
     return y
 
 
@@ -216,12 +215,13 @@ def main():
     opt['gen'].setup(gen)
     opt['dis'].setup(dis)
 
-    train, test = datasets.get_mnist(withlabel=True, ndim=3)
-    idx = np.where(train._datasets[1] == 8)
-    #train_zeros = train._datasets[0][idx[0][:500]]
-    train_zeros = train._datasets[0][idx[:int(idx[0].shape[0])]]
-#    train_zeros = train._datasets[0]
+    # train, test = datasets.get_mnist(withlabel=True, ndim=3)
 
+    # idx = np.where(train._datasets[1] == 8)
+    #train_zeros = train._datasets[0][idx[0][:500]]
+    # train_zeros = train._datasets[0][idx[:int(idx[0].shape[0])]]
+#    train_zeros = train._datasets[0]
+    train_zeros = np.load("rotated.npy").reshape((-1,1,28,28))
     train_iter = iterators.SerialIterator(train_zeros, batch_size=args.batchsize)
 
     updater = GAN_Updater(train_iter, gen, dis, opt,
@@ -230,6 +230,10 @@ def main():
 
     trainer.extend(extensions.dump_graph('loss'))
     trainer.extend(extensions.snapshot(), trigger=(args.epoch, 'epoch'))
+    trainer.extend(extensions.snapshot_object(
+        gen, 'gen_iter_{.updater.iteration}'), trigger=(args.epoch, 'epoch'))
+    trainer.extend(extensions.snapshot_object(
+        dis, 'dis_iter_{.updater.iteration}'), trigger=(args.epoch, 'epoch'))
     trainer.extend(extensions.LogReport())
     trainer.extend(extensions.PrintReport(
         ['epoch', 'loss', 'loss_gen', 'loss_data']))
