@@ -36,7 +36,7 @@ def rotate_lines():
     rotations = np.array([np.asarray(im.rotate(uniform(0, 360)), dtype=np.float32) for i in range(8000)])
     np.save("rotated.npy", rotations)
 
-
+    
 def length_lines(samples = 8000):
     out = []
     for i in range(samples):
@@ -50,6 +50,7 @@ def length_lines(samples = 8000):
 
 if __name__ == "__main__":
     moved_lines()
+
 
 # for i in range(10):
 #     im.rotate(uniform(0, 360)).save("sample_%d.jpg" % i)
