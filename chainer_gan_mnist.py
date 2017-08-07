@@ -1,6 +1,8 @@
 # ^-^ coding: UTF-8 ^-^
 import argparse
-
+import matplotlib
+matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
+import matplotlib.pyplot as plt
 import numpy as np
 import chainer
 import cupy
@@ -14,12 +16,13 @@ import chainer.functions as F
 import chainer.links as L
 from chainer.training import extensions
 from itertools import product
-
+from line_labler import histogram
+from digit_generator import *
 from scipy.misc import imsave
 
 width = .5
-
-num_samples = 15
+model_num = 0
+# num_samples = 15
 
 class InvertLoss(function.Function):
     def __init__(self):
@@ -161,14 +164,14 @@ class GAN_Updater(training.StandardUpdater):
              'loss_data': loss_data / batchsize})
 
 
-def save_x(x_gen):
+def save_x(x_gen, fn):
     x_gen_img = cuda.to_cpu(x_gen.data)
     n = x_gen_img.shape[0]
     n = n // 15 * 15
     x_gen_img = x_gen_img[:n]
     x_gen_img = x_gen_img.reshape(
         15, -1, 28, 28).transpose(1, 2, 0, 3).reshape(-1, 15 * 28)
-    imsave('x_gen.png', x_gen_img)
+    imsave('%s%d.png' % (fn, model_num), x_gen_img)
 
 def plot_z_space(gen, granularity=.125):
     num_samples = int(width*2/granularity)
@@ -182,7 +185,7 @@ def plot_z_space(gen, granularity=.125):
     zs_gpu = cuda.to_gpu(zs.reshape(num_samples**z_dim,z_dim,1,1), device=0)
     z = Variable(zs_gpu)
     y = gen(z)
-    print y.shape
+    print(y.shape)
     return y
 
 
@@ -218,12 +221,12 @@ def main():
     opt['gen'].setup(gen)
     opt['dis'].setup(dis)
 
-    train, test = datasets.get_mnist(withlabel=True, ndim=3)
-    idx = np.where(train._datasets[1] == 8)
+    # train, test = datasets.get_mnist(withlabel=True, ndim=3)
+    # idx = np.where(train._datasets[1] == 8)
     #train_zeros = train._datasets[0][idx[0][:500]]
-    train_zeros = train._datasets[0][idx[:int(idx[0].shape[0])]]
+    # train_zeros = train._datasets[0][idx[:int(idx[0].shape[0])]]
 #    train_zeros = train._datasets[0]
-
+    train_zeros = np.load("rotated.npy").reshape(-1, 1, 28, 28)
     train_iter = iterators.SerialIterator(train_zeros, batch_size=args.batchsize)
 
     updater = GAN_Updater(train_iter, gen, dis, opt,
@@ -244,15 +247,20 @@ def main():
     trainer.run()
 
     np.save('x_gen.npy', cuda.to_cpu(x_gen.data))
-    save_x(x_gen)
+    save_x(x_gen, "x_gen")
 
     y = plot_z_space(gen, granularity=.05)
     np.save('y_gen.npy', cuda.to_cpu(y.data))
 
-    save_x(y)
+    save_x(y, "y_gen")
 
 
 
 
 if __name__ == '__main__':
-    main()
+    for i in range(5):
+        model_num = i
+        rotate_lines()
+        main()
+        histogram(i, "x_gen.npy")
+        histogram(i, "y_gen.npy")

@@ -5,14 +5,14 @@ matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
 import matplotlib.pyplot as plt
 
 
-def histogram(train_no):
+def histogram(train_no, fn):
     try:
-        angles = [np.degrees(cv2.HoughLines(cv2.Canny(sample,50,150,apertureSize = 3),1,np.pi/180,10)[0][0][1]) for sample in (np.load("y_gen.npy")*255).astype(np.uint8).reshape(-1,28,28)]
+        angles = [np.degrees(cv2.HoughLines(cv2.Canny(sample,50,150,apertureSize = 3),1,np.pi/180,10)[0][0][1]) for sample in (np.load(fn)*255).astype(np.uint8).reshape(-1,28,28)]
         hist = np.histogram(angles)
         fig = plt.figure()
 
         plt.bar(hist[1][:-1], hist[0])
-        fig.savefig("histogram_%d.png" % train_no)
+        fig.savefig("histogram_%s%d.png" % (fn, train_no))
     except: 
         print("couldn't find lines in samples from batch no %d" % train_no)
 
