@@ -20,7 +20,7 @@ from digit_generator import gen_lines
 from line_labler import histogram
 from scipy.misc import imsave
 
-width = 1
+width = .5
 num_samples = 15
 model_no = 0
 
@@ -175,7 +175,7 @@ def save_x(x_gen):
 
 def plot_z_space(gen, granularity=.125):
     num_samples = int(width*2/granularity)
-    z_dim = 2
+    z_dim = 1
     x = np.arange(-width,width, granularity)
     zs = np.meshgrid(*([x]*z_dim))
     #zs = list(product(np.linspace(-width,width,num_samples), 
@@ -252,7 +252,7 @@ def main():
     np.save('x_gen.npy', cuda.to_cpu(x_gen.data))
     save_x(x_gen)
 
-    y = plot_z_space(gen)
+    y = plot_z_space(gen, granularity=.05)
     np.save('y_gen.npy', cuda.to_cpu(y.data))
     save_x(y)
 
