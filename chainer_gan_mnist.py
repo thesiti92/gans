@@ -19,87 +19,10 @@ from itertools import product
 from line_labler import histogram
 from digit_generator import *
 from scipy.misc import imsave
+from gan_models import Generator, Discriminator, InvertLoss
 
-width = .5
-model_num = 0
+width = 4
 # num_samples = 15
-
-class InvertLoss(function.Function):
-    def __init__(self):
-        pass
-
-    def check_type_forward(self, in_types):
-        pass
-    #type_check.expect(in_types.size() == 1)
-    #x_type, = in_types
-    #type_check.expect(x_type.dtype.kind == 'f')
-
-    def forward_cpu(self, x):
-        return x
-
-    def forward_gpu(self, x):
-        return x
-
-    def backward_cpu(self, x, gy):
-        #gy is gradient
-        return (1./np.exp(gy[0])),
-
-    def backward_gpu(self, x, gy):
-        return (-gy[0]),
-        #return (1./cupy.exp(gy[0])),
-
-
-class Generator(Chain):
-
-    def __init__(self, z_dim):
-        super(Generator, self).__init__(
-            # in_ch,out_ch,ksize,stride,pad
-            l1=L.Deconvolution2D(z_dim, 128, 3, 2, 0),
-            bn1=L.BatchNormalization(128),
-            l2=L.Deconvolution2D(128, 128, 3, 2, 1),
-            bn2=L.BatchNormalization(128),
-            l3=L.Deconvolution2D(128, 128, 3, 2, 1),
-            bn3=L.BatchNormalization(128),
-            l4=L.Deconvolution2D(128, 128, 3, 2, 2),
-            bn4=L.BatchNormalization(128),
-            l5=L.Deconvolution2D(128, 1, 3, 2, 2, outsize=(28, 28)),
-        )
-        self.train = True
-
-    def __call__(self, z):
-        h = self.bn1(F.relu(self.l1(z)))
-        h = self.bn2(F.relu(self.l2(h)))
-        h = self.bn3(F.relu(self.l3(h)))
-        h = self.bn4(F.relu(self.l4(h)))
-        x = F.sigmoid(self.l5(h))
-        #x = InvertLoss()(x)
-        return x
-
-
-class Discriminator(Chain):
-
-    def __init__(self):
-        super(Discriminator, self).__init__(
-            # in_ch,out_ch,ksize,stride,pad
-            l1=L.Convolution2D(None, 32, 3, 2, 1),
-            bn1=L.BatchNormalization(32),
-            l2=L.Convolution2D(None, 32, 3, 2, 2),
-            bn2=L.BatchNormalization(32),
-            l3=L.Convolution2D(None, 32, 3, 2, 1),
-            bn3=L.BatchNormalization(32),
-            l4=L.Convolution2D(None, 32, 3, 2, 1),
-            bn4=L.BatchNormalization(32),
-            l5=L.Convolution2D(None, 1, 3, 2, 1),
-        )
-
-    def __call__(self, x):
-        h = self.bn1(F.leaky_relu(self.l1(x)))
-        h = self.bn2(F.leaky_relu(self.l2(h)))
-        h = self.bn3(F.leaky_relu(self.l3(h)))
-        h = self.bn4(F.leaky_relu(self.l4(h)))
-        y = self.l5(h)
-        return y
-
 
 class GAN_Updater(training.StandardUpdater):
 
@@ -124,10 +47,10 @@ class GAN_Updater(training.StandardUpdater):
         x_data = in_arrays
 
         batchsize = x_data.shape[0]
-        z = Variable(cuda.cupy.random.normal(
-            size=(batchsize, self.z_dim, 1, 1), dtype=np.float32))
-        #z = Variable(cuda.cupy.random.uniform(
-        #    size=(batchsize, self.z_dim, 1, 1), low=-width, high=width, dtype=np.float32))
+        # z = Variable(cuda.cupy.random.normal(
+        #     size=(batchsize, self.z_dim, 1, 1), dtype=np.float32))
+        z = Variable(cuda.cupy.random.uniform(
+           size=(batchsize, self.z_dim, 1, 1), low=-width, high=width, dtype=np.float32))
         # zs = list(product(np.linspace(-width,width,num_samples), 
         #                   np.linspace(-width,width,num_samples)))
         # zs = np.array(zs).astype('float32')
@@ -171,11 +94,10 @@ def save_x(x_gen, fn):
     x_gen_img = x_gen_img[:n]
     x_gen_img = x_gen_img.reshape(
         15, -1, 28, 28).transpose(1, 2, 0, 3).reshape(-1, 15 * 28)
-    imsave('%s%d.png' % (fn, model_num), x_gen_img)
+    imsave('%s.png' % fn, x_gen_img)
 
-def plot_z_space(gen, granularity=.125):
+def plot_z_space(gen, granularity=.125, z_dim = 2):
     num_samples = int(width*2/granularity)
-    z_dim = 1
     x = np.arange(-width,width, granularity)
 
     zs = np.meshgrid(*([x]*z_dim))
@@ -190,6 +112,8 @@ def plot_z_space(gen, granularity=.125):
 
 
 def main():
+
+
     parser = argparse.ArgumentParser(description='GAN_MNIST')
     parser.add_argument('--batchsize', '-b', type=int, default=200,
                         help='Number of images in each mini-batch')
@@ -203,64 +127,68 @@ def main():
                         help='Resume the training from snapshot')
     parser.add_argument('--z_dim', '-z', default=2, type=int,
                         help='Dimension of random variable')
+    parser.add_argument('--loops', '-l', default=5, type=int,
+                        help='number of models to train and eval')
     args = parser.parse_args()
+    for i in range(args.loops):
 
-    print('GPU: {}'.format(args.gpu))
-    print('# z_dim: {}'.format(args.z_dim))
-    print('# Minibatch-size: {}'.format(args.batchsize))
-    print('# epoch: {}'.format(args.epoch))
-    print('')
+        rotate_lines()
+        print('GPU: {}'.format(args.gpu))
+        print('# z_dim: {}'.format(args.z_dim))
+        print('# Minibatch-size: {}'.format(args.batchsize))
+        print('# epoch: {}'.format(args.epoch))
+        print('')
 
-    gen = Generator(args.z_dim)
-    dis = Discriminator()
-    gen.to_gpu()
-    dis.to_gpu()
+        gen = Generator(args.z_dim)
+        dis = Discriminator()
+        gen.to_gpu()
+        dis.to_gpu()
 
-    opt = {'gen': optimizers.Adam(alpha=0.001, beta1=0.5),  # alphaã®ç¬¦å·ãŒé‡è¦
-           'dis': optimizers.Adam(alpha=0.001, beta1=0.5)}
-    opt['gen'].setup(gen)
-    opt['dis'].setup(dis)
+        opt = {'gen': optimizers.Adam(alpha=0.0001, beta1=0.5),  # alphaã®ç¬¦å·ãŒé‡è¦
+            'dis': optimizers.Adam(alpha=0.0001, beta1=0.5)}
+        opt['gen'].setup(gen)
+        opt['dis'].setup(dis)
 
-    # train, test = datasets.get_mnist(withlabel=True, ndim=3)
-    # idx = np.where(train._datasets[1] == 8)
-    #train_zeros = train._datasets[0][idx[0][:500]]
-    # train_zeros = train._datasets[0][idx[:int(idx[0].shape[0])]]
-#    train_zeros = train._datasets[0]
-    train_zeros = np.load("rotated.npy").reshape(-1, 1, 28, 28)
-    train_iter = iterators.SerialIterator(train_zeros, batch_size=args.batchsize)
+        # train, test = datasets.get_mnist(withlabel=True, ndim=3)
+        # idx = np.where(train._datasets[1] == 8)
+        #train_zeros = train._datasets[0][idx[0][:500]]
+        # train_zeros = train._datasets[0][idx[:int(idx[0].shape[0])]]
+    #    train_zeros = train._datasets[0]
+        train_zeros = np.load("rotated.npy").reshape(-1, 1, 28, 28)
+        train_iter = iterators.SerialIterator(train_zeros, batch_size=args.batchsize)
 
-    updater = GAN_Updater(train_iter, gen, dis, opt,
-                          device=args.gpu, z_dim=args.z_dim)
-    trainer = training.Trainer(updater, (args.epoch, 'epoch'), out=args.out)
+        updater = GAN_Updater(train_iter, gen, dis, opt,
+                            device=args.gpu, z_dim=args.z_dim)
+        trainer = training.Trainer(updater, (args.epoch, 'epoch'), out=args.out)
 
-    trainer.extend(extensions.dump_graph('loss'))
-    trainer.extend(extensions.snapshot(), trigger=(args.epoch, 'epoch'))
-    trainer.extend(extensions.LogReport())
-    trainer.extend(extensions.PrintReport(
-        ['epoch', 'loss', 'loss_gen', 'loss_data']))
-    trainer.extend(extensions.ProgressBar(update_interval=100))
+        trainer.extend(extensions.dump_graph('loss'))
+        trainer.extend(extensions.snapshot(), trigger=(args.epoch, 'epoch'))
+        trainer.extend(extensions.snapshot_object(
+            gen, 'gen_iter_{.updater.iteration}'))
+        trainer.extend(extensions.snapshot_object(
+            dis, 'dis_iter_{.updater.iteration}'))
+        trainer.extend(extensions.LogReport())
+        trainer.extend(extensions.PrintReport(
+            ['epoch', 'loss', 'loss_gen', 'loss_data']))
+        trainer.extend(extensions.ProgressBar(update_interval=100))
 
-    if args.resume:
-        # Resume from a snapshot
-        chainer.serializers.load_npz(args.resume, trainer)
+        if args.resume:
+            # Resume from a snapshot
+            chainer.serializers.load_npz(args.resume, trainer)
 
-    trainer.run()
+        trainer.run()
 
-    np.save('x_gen.npy', cuda.to_cpu(x_gen.data))
-    save_x(x_gen, "x_gen")
+        np.save('x_gen.npy', cuda.to_cpu(x_gen.data))
+        save_x(x_gen, "x_gen%d" % i)
 
-    y = plot_z_space(gen, granularity=.05)
-    np.save('y_gen.npy', cuda.to_cpu(y.data))
+        y = plot_z_space(gen, granularity=.1, z_dim = args.z_dim)
+        np.save('y_gen.npy', cuda.to_cpu(y.data))
 
-    save_x(y, "y_gen")
-
+        save_x(y, "y_gen%d" % i)
+        histogram(i, "x_gen")
+        histogram(i, "y_gen")
 
 
 
 if __name__ == '__main__':
-    for i in range(5):
-        model_num = i
-        rotate_lines()
         main()
-        histogram(i, "x_gen.npy")
-        histogram(i, "y_gen.npy")
