@@ -15,7 +15,18 @@ from random import uniform
 # for i in range(10):
 #     pic.rotate(uniform(-45, 45)).crop((14,14,14*3,14*3)).save("sample_%d.jpg" % i)
 
-def gen_lines():
+def moved_lines(samples = 8000):
+    out = []
+    for i in range(samples):
+        im = Image.new('1', (28,28))
+        draw = ImageDraw.Draw(im)
+        size = uniform(0, 28)
+        draw.line([(size, 0), (size, 28)], width=6, fill=255)
+        del draw
+        out.append(np.asarray(im))
+    np.save("moved.npy", np.array(out))
+
+def rotate_lines():
     im = Image.new('1', (28,28))
 
     draw = ImageDraw.Draw(im)
@@ -24,6 +35,22 @@ def gen_lines():
 
     rotations = np.array([np.asarray(im.rotate(uniform(0, 360)), dtype=np.float32) for i in range(8000)])
     np.save("rotated.npy", rotations)
+
+    
+def length_lines(samples = 8000):
+    out = []
+    for i in range(samples):
+        im = Image.new('1', (28,28))
+        draw = ImageDraw.Draw(im)
+        size = uniform(0, 28)
+        draw.line([(0, 0), (size, size)], width=6, fill=255)
+        del draw
+        out.append(np.asarray(im))
+    np.save("resized.npy", np.array(out))
+
+if __name__ == "__main__":
+    moved_lines()
+
 
 # for i in range(10):
 #     im.rotate(uniform(0, 360)).save("sample_%d.jpg" % i)
