@@ -37,19 +37,19 @@ def rotate_lines():
     np.save("rotated.npy", rotations)
 
     
-def length_lines(samples = 8000):
+def scale_lines(samples = 8000):
     out = []
     for i in range(samples):
         im = Image.new('1', (28,28))
         draw = ImageDraw.Draw(im)
-        size = uniform(0, 28)
-        draw.line([(0, 0), (size, size)], width=6, fill=255)
+        scale = uniform(1, 14)
+        draw.line([(14, 14+scale), (14, 14-scale)], width=6, fill=255)
         del draw
-        out.append(np.asarray(im))
+        out.append(np.asarray(im).astype(np.float32))
     np.save("resized.npy", np.array(out))
 
 if __name__ == "__main__":
-    moved_lines()
+    length_lines()
 
 
 # for i in range(10):

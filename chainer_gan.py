@@ -18,6 +18,7 @@ from chainer.training import extensions
 from itertools import product
 from line_labler import histogram
 from digit_generator import *
+from z_dim_fun import plot_z
 from scipy.misc import imsave
 from gan_models import Generator, Discriminator, InvertLoss
 
@@ -132,7 +133,7 @@ def main():
     args = parser.parse_args()
     for i in range(args.loops):
 
-        rotate_lines()
+        scale_lines()
         print('GPU: {}'.format(args.gpu))
         print('# z_dim: {}'.format(args.z_dim))
         print('# Minibatch-size: {}'.format(args.batchsize))
@@ -144,8 +145,8 @@ def main():
         gen.to_gpu()
         dis.to_gpu()
 
-        opt = {'gen': optimizers.Adam(alpha=0.0001, beta1=0.5),  # alphaã®ç¬¦å·ãŒé‡è¦
-            'dis': optimizers.Adam(alpha=0.0001, beta1=0.5)}
+        opt = {'gen': optimizers.Adam(alpha=0.001, beta1=0.5),  # alphaã®ç¬¦å·ãŒé‡è¦
+            'dis': optimizers.Adam(alpha=0.00001, beta1=0.5)}
         opt['gen'].setup(gen)
         opt['dis'].setup(dis)
 
@@ -154,7 +155,7 @@ def main():
         #train_zeros = train._datasets[0][idx[0][:500]]
         # train_zeros = train._datasets[0][idx[:int(idx[0].shape[0])]]
     #    train_zeros = train._datasets[0]
-        train_zeros = np.load("rotated.npy").reshape(-1, 1, 28, 28)
+        train_zeros = np.load("resized.npy").reshape(-1, 1, 28, 28)
         train_iter = iterators.SerialIterator(train_zeros, batch_size=args.batchsize)
 
         updater = GAN_Updater(train_iter, gen, dis, opt,
@@ -171,6 +172,8 @@ def main():
         trainer.extend(extensions.PrintReport(
             ['epoch', 'loss', 'loss_gen', 'loss_data']))
         trainer.extend(extensions.ProgressBar(update_interval=100))
+        trainer.extend(plot_z)
+
 
         if args.resume:
             # Resume from a snapshot
@@ -187,6 +190,7 @@ def main():
         save_x(y, "y_gen%d" % i)
         histogram(i, "x_gen")
         histogram(i, "y_gen")
+
 
 
 
