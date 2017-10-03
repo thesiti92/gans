@@ -1,3 +1,5 @@
+#generates datasets of geometrically transformed lines.
+#commented out code is for generating randomely rotated twos
 import json
 from PIL import Image, ImageDraw
 import numpy as np
