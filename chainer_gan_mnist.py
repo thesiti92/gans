@@ -1,6 +1,8 @@
 # ^-^ coding: UTF-8 ^-^
 import argparse
-
+import matplotlib
+matplotlib.use('Agg') # Must be before importing matplotlib.pyplot or pylab!
+import matplotlib.pyplot as plt
 import numpy as np
 import chainer
 import cupy
@@ -14,11 +16,13 @@ import chainer.functions as F
 import chainer.links as L
 from chainer.training import extensions
 from itertools import product
-
+from digit_generator import gen_lines
+from line_labler import histogram
 from scipy.misc import imsave
 
-width = 2
+width = 1
 num_samples = 15
+model_no = 0
 
 class InvertLoss(function.Function):
     def __init__(self):
@@ -167,12 +171,12 @@ def save_x(x_gen):
     x_gen_img = x_gen_img[:n]
     x_gen_img = x_gen_img.reshape(
         15, -1, 28, 28).transpose(1, 2, 0, 3).reshape(-1, 15 * 28)
-    imsave('x_gen.png', x_gen_img)
+    imsave('x_gen%d.png' % model_no, x_gen_img)
 
-def plot_z_space(gen,width=2):
-    num_samples = 15**2
-    z_dim = 1
-    x = np.linspace(-width,width,num_samples)
+def plot_z_space(gen, granularity=.125):
+    num_samples = int(width*2/granularity)
+    z_dim = 2
+    x = np.arange(-width,width, granularity)
     zs = np.meshgrid(*([x]*z_dim))
     #zs = list(product(np.linspace(-width,width,num_samples), 
     #                  np.linspace(-width,width,num_samples)))
@@ -180,7 +184,6 @@ def plot_z_space(gen,width=2):
     zs_gpu = cuda.to_gpu(zs.reshape(num_samples**z_dim,z_dim,1,1), device=0)
     z = Variable(zs_gpu)
     y = gen(z)
-    print y.shape
     return y
 
 
@@ -216,12 +219,13 @@ def main():
     opt['gen'].setup(gen)
     opt['dis'].setup(dis)
 
-    train, test = datasets.get_mnist(withlabel=True, ndim=3)
-    idx = np.where(train._datasets[1] == 8)
-    #train_zeros = train._datasets[0][idx[0][:500]]
-    train_zeros = train._datasets[0][idx[:int(idx[0].shape[0])]]
-#    train_zeros = train._datasets[0]
+    # train, test = datasets.get_mnist(withlabel=True, ndim=3)
 
+    # idx = np.where(train._datasets[1] == 8)
+    #train_zeros = train._datasets[0][idx[0][:500]]
+    # train_zeros = train._datasets[0][idx[:int(idx[0].shape[0])]]
+#    train_zeros = train._datasets[0]
+    train_zeros = np.load("rotated.npy").reshape((-1,1,28,28))
     train_iter = iterators.SerialIterator(train_zeros, batch_size=args.batchsize)
 
     updater = GAN_Updater(train_iter, gen, dis, opt,
@@ -230,6 +234,10 @@ def main():
 
     trainer.extend(extensions.dump_graph('loss'))
     trainer.extend(extensions.snapshot(), trigger=(args.epoch, 'epoch'))
+    trainer.extend(extensions.snapshot_object(
+        gen, 'gen_iter_{.updater.iteration}'), trigger=(args.epoch, 'epoch'))
+    trainer.extend(extensions.snapshot_object(
+        dis, 'dis_iter_{.updater.iteration}'), trigger=(args.epoch, 'epoch'))
     trainer.extend(extensions.LogReport())
     trainer.extend(extensions.PrintReport(
         ['epoch', 'loss', 'loss_gen', 'loss_data']))
@@ -244,11 +252,16 @@ def main():
     np.save('x_gen.npy', cuda.to_cpu(x_gen.data))
     save_x(x_gen)
 
-    y = plot_z_space(gen, width=2)
+    y = plot_z_space(gen)
+    np.save('y_gen.npy', cuda.to_cpu(y.data))
     save_x(y)
 
 
 
 
 if __name__ == '__main__':
-    main()
+    for i in range(5):
+        model_no = i
+        gen_lines()
+        main()
+        histogram(i)
